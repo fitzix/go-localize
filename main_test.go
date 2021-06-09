@@ -86,7 +86,7 @@ func Test_generateLocalizations(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := generateLocalizations(tt.args.files)
+			got, _, err := generateLocalizations(tt.args.files)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("generateLocalizations() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -126,7 +126,7 @@ func Test_generateFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := generateFile(tt.args.output, tt.args.translations); (err != nil) != tt.wantErr {
+			if err := generateFile(tt.args.output, nil, tt.args.translations); (err != nil) != tt.wantErr {
 				t.Errorf("generateFile() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -166,7 +166,7 @@ func Test_getLocalizationsFromFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getLocalizationsFromFile(tt.args.file)
+			got, _, err := getLocalizationsFromFile(tt.args.file)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getLocalizationsFromFile() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -12,10 +12,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/iancoleman/strcase"
 	"gopkg.in/yaml.v2"
 )
 
@@ -28,6 +30,13 @@ const (
 )
 
 type localizationFile map[string]string
+
+type TmplValues struct {
+	Timestamp     time.Time
+	Keys          map[string]string
+	Localizations map[string]string
+	Package       string
+}
 
 const (
 	defaultOutputDir = "localizations"
@@ -59,26 +68,42 @@ func run(in, out *string) error {
 		return err
 	}
 
-	localizations, err := generateLocalizations(files)
+	localizations, keys, err := generateLocalizations(files)
 	if err != nil {
 		return err
 	}
 
-	return generateFile(outputDir, localizations)
+	return generateFile(outputDir, keys, localizations)
 }
 
-func generateLocalizations(files []string) (map[string]string, error) {
+func generateLocalizations(files []string) (map[string]string, []string, error) {
 	localizations := map[string]string{}
+	keyMap := make(map[string]struct{})
 	for _, file := range files {
-		newLocalizations, err := getLocalizationsFromFile(file)
+		newLocalizations, keys, err := getLocalizationsFromFile(file)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for key, value := range newLocalizations {
 			localizations[key] = value
 		}
+
+		for _, v := range keys {
+			keyMap[v] = struct{}{}
+		}
 	}
-	return localizations, nil
+
+	keys := make([]string, 0)
+
+	for k := range keyMap {
+		keys = append(keys, k)
+	}
+
+	sort.SliceStable(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+
+	return localizations, keys, nil
 }
 
 func getLocalizationFiles(dir string) ([]string, error) {
@@ -93,7 +118,7 @@ func getLocalizationFiles(dir string) ([]string, error) {
 	return files, err
 }
 
-func generateFile(output string, localizations map[string]string) error {
+func generateFile(output string, keys []string, localizations map[string]string) error {
 	dir := output
 	parent := output
 	if strings.Contains(output, string(filepath.Separator)) {
@@ -110,28 +135,31 @@ func generateFile(output string, localizations map[string]string) error {
 		return err
 	}
 
-	return packageTemplate.Execute(f, struct {
-		Timestamp     time.Time
-		Localizations map[string]string
-		Package       string
-	}{
+	keyMap := make(map[string]string)
+
+	for _, v := range keys {
+		keyMap[strcase.ToCamel(v)] = v
+	}
+
+	return packageTemplate.Execute(f, TmplValues{
 		Timestamp:     time.Now(),
+		Keys:          keyMap,
 		Localizations: localizations,
 		Package:       parent,
 	})
 }
 
-func getLocalizationsFromFile(file string) (map[string]string, error) {
+func getLocalizationsFromFile(file string) (map[string]string, []string, error) {
 	newLocalizations := map[string]string{}
 
 	openFile, err := os.Open(file)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	byteValue, err := ioutil.ReadAll(openFile)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	localizationFile := localizationFile{}
@@ -146,19 +174,21 @@ func getLocalizationsFromFile(file string) (map[string]string, error) {
 	case csvFileExt:
 		err = parseCSV(byteValue, &localizationFile)
 	default:
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
+	keys := make([]string, 0, len(localizationFile))
 	slicePath := getSlicePath(file)
 	for key, value := range localizationFile {
 		newLocalizations[strings.Join(append(slicePath, key), ".")] = value
+		keys = append(keys, key)
 	}
 
-	return newLocalizations, nil
+	return newLocalizations, keys, nil
 }
 
 func parseCSV(value []byte, l *localizationFile) error {
