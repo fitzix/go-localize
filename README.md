@@ -24,8 +24,9 @@ The suggested way to use go-localize is to use `go generate`. For example, take 
 ```
 goapp
 └── localizations_src
-    ├── en
-    │   └── messages.yaml
+    ├── module
+    │   └── en.yaml
+    │   └── ar.yaml
     └── es
         ├── customer
         │   └── messages.json
