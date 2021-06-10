@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"os"
@@ -27,6 +29,7 @@ const (
 	ymlFileExt  = ".yml"
 	tomlFileExt = ".toml"
 	csvFileExt  = ".csv"
+	zipFileExt  = ".zip"
 )
 
 type localizationFile map[string]string
@@ -47,6 +50,7 @@ var (
 	output = flag.String("output", "", "where to output the generated package")
 
 	errFlagInputNotSet = errors.New("the flag -input must be set")
+	needRemovePaths    = make([]string, 0)
 )
 
 func main() {
@@ -54,6 +58,12 @@ func main() {
 
 	if err := run(input, output); err != nil {
 		log.Fatal(err.Error())
+	}
+
+	log.Printf("---> %v", needRemovePaths)
+
+	if len(needRemovePaths) > 0 {
+		removeZipFile(needRemovePaths)
 	}
 }
 
@@ -108,6 +118,17 @@ func generateLocalizations(files []string) (map[string]string, []string, error) 
 
 func getLocalizationFiles(dir string) ([]string, error) {
 	var files []string
+
+	if err := filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
+		ext := filepath.Ext(path)
+		if !info.IsDir() && ext == zipFileExt {
+			return Unzip(path, dir)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		ext := filepath.Ext(path)
 		if !info.IsDir() && (ext == jsonFileExt || ext == yamlFileExt) {
@@ -257,4 +278,54 @@ func parseFlags(input *string, output *string) (string, string, error) {
 	inputDir = *input
 
 	return inputDir, outputDir, nil
+}
+
+// Unzip 解压zip
+func Unzip(archive, target string) error {
+	reader, err := zip.OpenReader(archive)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(target, 0755); err != nil {
+		return err
+	}
+
+	for _, file := range reader.File {
+		unzipPath := filepath.Join(target, file.Name)
+
+		needRemovePaths = append(needRemovePaths, unzipPath)
+
+		if file.FileInfo().IsDir() {
+			err := os.MkdirAll(unzipPath, file.Mode())
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		fileReader, err := file.Open()
+		if err != nil {
+			return err
+		}
+		defer fileReader.Close()
+
+		targetFile, err := os.OpenFile(unzipPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+		if err != nil {
+			return err
+		}
+		defer targetFile.Close()
+
+		if _, err := io.Copy(targetFile, fileReader); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func removeZipFile(paths []string) {
+	for _, v := range paths {
+		_ = os.RemoveAll(v)
+	}
 }
