@@ -181,11 +181,18 @@ func getLocalizationsFromFile(file string) (map[string]string, []string, error) 
 		return nil, nil, err
 	}
 
-	keys := make([]string, 0, len(localizationFile))
 	slicePath := getSlicePath(file)
+
+	keys := make([]string, 0, len(localizationFile))
+	var keyPrefix string
+
+	if len(slicePath) > 1 {
+		keyPrefix = strings.Join(slicePath[1:], ".")
+	}
+
 	for key, value := range localizationFile {
 		newLocalizations[strings.Join(append(slicePath, key), ".")] = value
-		keys = append(keys, key)
+		keys = append(keys, keyPrefix+"."+key)
 	}
 
 	return newLocalizations, keys, nil
@@ -224,6 +231,11 @@ func getSlicePath(file string) []string {
 	}
 
 	strs = append(strs, strings.Replace(file, filepath.Ext(file), "", -1))
+
+	if length := len(strs); length > 1 {
+		strs[0], strs[length-1] = strs[length-1], strs[0]
+	}
+
 	return strs
 }
 
