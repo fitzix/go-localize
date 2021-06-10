@@ -23,7 +23,7 @@ func GetWithLocale(locale string, key i18n.Key, replacements ...*i18n.Replacemen
 
 const (
 {{- range $key, $element := .Keys }}
-	{{ $key }} = "{{ $element }}"
+	{{ $key }} i18n.Key = "{{ $element }}"
 {{- end }}
 )
 

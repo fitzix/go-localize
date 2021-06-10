@@ -1,4 +1,4 @@
-module github.com/fitzix/go-localize/v2
+module github.com/fitzix/go-localize
 
 go 1.13
 
