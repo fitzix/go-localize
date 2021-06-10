@@ -17,11 +17,9 @@ import (
 
 var l = i18n.New("en", "en", localizations)
 
-func GetWithLocale(locale string, key I18nKey, replacements ...*i18n.Replacements) string {
-	return l.GetWithLocale(locale, string(key), replacements...)
+func GetWithLocale(locale string, key i18n.Key, replacements ...*i18n.Replacements) string {
+	return l.GetWithLocale(locale, key, replacements...)
 }
-
-type I18nKey string
 
 const (
 {{- range $key, $element := .Keys }}
