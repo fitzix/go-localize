@@ -27,10 +27,9 @@ goapp
     ├── module
     │   └── en.yaml
     │   └── ar.yaml
-    └── es
-        ├── customer
-        │   └── messages.json
-        └── messages.json
+    └── module1
+        ├── sub_module
+        │   └── en.json
 ```
 
 Example of JSON translation file:
