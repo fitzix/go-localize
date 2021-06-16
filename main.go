@@ -60,8 +60,6 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
-	log.Printf("---> %v", needRemovePaths)
-
 	if len(needRemovePaths) > 0 {
 		removeZipFile(needRemovePaths)
 	}
@@ -213,7 +211,11 @@ func getLocalizationsFromFile(file string) (map[string]string, []string, error) 
 
 	for key, value := range localizationFile {
 		newLocalizations[strings.Join(append(slicePath, key), ".")] = value
-		keys = append(keys, keyPrefix+"."+key)
+		tmpKey := key
+		if keyPrefix != "" {
+			tmpKey = keyPrefix + "." + key
+		}
+		keys = append(keys, tmpKey)
 	}
 
 	return newLocalizations, keys, nil
