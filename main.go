@@ -288,21 +288,15 @@ func Unzip(archive, target string) error {
 	if err != nil {
 		return err
 	}
+	defer reader.Close()
 
 	if err := os.MkdirAll(target, 0755); err != nil {
 		return err
 	}
 
 	for _, file := range reader.File {
-		unzipPath := filepath.Join(target, file.Name)
-
-		needRemovePaths = append(needRemovePaths, unzipPath)
 
 		if file.FileInfo().IsDir() {
-			err := os.MkdirAll(unzipPath, file.Mode())
-			if err != nil {
-				return err
-			}
 			continue
 		}
 
@@ -311,6 +305,12 @@ func Unzip(archive, target string) error {
 			return err
 		}
 		defer fileReader.Close()
+
+		_, fileName := filepath.Split(file.Name)
+
+		unzipPath := filepath.Join(target, fileName)
+
+		needRemovePaths = append(needRemovePaths, unzipPath)
 
 		targetFile, err := os.OpenFile(unzipPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
 		if err != nil {
