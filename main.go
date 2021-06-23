@@ -9,12 +9,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,6 +40,7 @@ type TmplValues struct {
 	Keys          map[string]string
 	Localizations map[string]string
 	Package       string
+	ListKeys      map[string][]string
 }
 
 const (
@@ -117,7 +119,7 @@ func generateLocalizations(files []string) (map[string]string, []string, error) 
 func getLocalizationFiles(dir string) ([]string, error) {
 	var files []string
 
-	if err := filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
+	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		ext := filepath.Ext(path)
 		if !info.IsDir() && ext == zipFileExt {
 			return Unzip(path, dir)
@@ -156,8 +158,40 @@ func generateFile(output string, keys []string, localizations map[string]string)
 
 	keyMap := make(map[string]string)
 
+	listKeyMap := make(map[string][]string)
+	r, _ := regexp.Compile(`^(.+)\.\d+$`)
+
 	for _, v := range keys {
-		keyMap[strcase.ToCamel(v)] = v
+		k := strcase.ToCamel(v)
+		keyMap[k] = v
+		matchs := r.FindStringSubmatch(v)
+		if len(matchs) == 2 {
+			listKey := strcase.ToCamel(matchs[1])
+			listKeyMap[listKey] = append(listKeyMap[listKey], k)
+		}
+	}
+
+	if len(listKeyMap) > 0 {
+		for k := range listKeyMap {
+			sort.SliceStable(listKeyMap[k], func(i, j int) bool {
+				a, _ := strconv.Atoi(strings.TrimLeft(listKeyMap[k][i], k))
+				b, _ := strconv.Atoi(strings.TrimLeft(listKeyMap[k][j], k))
+				return a < b
+			})
+		}
+
+		listUtilFp, err := os.Create(fmt.Sprintf("%v/%v.go", dir, "localizations_util"))
+		if err != nil {
+			return err
+		}
+		err = packageTemplateUtil.Execute(listUtilFp, TmplValues{
+			Timestamp: time.Now(),
+			Package:   parent,
+			ListKeys:  listKeyMap,
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	return packageTemplate.Execute(f, TmplValues{
@@ -165,6 +199,7 @@ func generateFile(output string, keys []string, localizations map[string]string)
 		Keys:          keyMap,
 		Localizations: localizations,
 		Package:       parent,
+		ListKeys:      listKeyMap,
 	})
 }
 
