@@ -180,7 +180,7 @@ func generateFile(output string, keys []string, localizations map[string]string)
 			})
 		}
 
-		listUtilFp, err := os.Create(fmt.Sprintf("%v/%v.go", dir, "localizations_util"))
+		listUtilFp, err := os.Create(fmt.Sprintf("%v/%v_util.go", dir, parent))
 		if err != nil {
 			return err
 		}
