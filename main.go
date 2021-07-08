@@ -93,7 +93,11 @@ func generateLocalizations(files []string) (map[string]string, []string, error) 
 			return nil, nil, err
 		}
 		for key, value := range newLocalizations {
-			localizations[key] = value
+			if !strings.Contains(value, "\\n") && strings.Contains(value, "\n") {
+				localizations[key] = strings.ReplaceAll(value, "\n", "\\n")
+			} else {
+				localizations[key] = value
+			}
 		}
 
 		for _, v := range keys {
