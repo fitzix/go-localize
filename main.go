@@ -133,7 +133,7 @@ func getLocalizationFiles(dir string) ([]string, error) {
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		ext := filepath.Ext(path)
-		if !info.IsDir() && (ext == jsonFileExt || ext == yamlFileExt) {
+		if !info.IsDir() && (ext == jsonFileExt || ext == yamlFileExt || ext == ymlFileExt) {
 			files = append(files, path)
 		}
 		return nil
