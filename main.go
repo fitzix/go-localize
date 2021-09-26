@@ -13,13 +13,18 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/go-resty/resty/v2"
 	"github.com/iancoleman/strcase"
+	"github.com/tmrwh/go-localize/models"
+	"github.com/tmrwh/go-localize/template"
 	"gopkg.in/yaml.v2"
 )
 
@@ -45,16 +50,33 @@ const (
 	defaultOutputDir = "localizations"
 )
 
+const (
+	tmsBaseApi      = "http://tms.ndog.co"
+	translationsApi = "/api/components/{project}/{components}/translations/"
+)
+
 var (
-	input  = flag.String("input", "", "input localizations folder")
-	output = flag.String("output", "", "where to output the generated package")
+	input      = flag.String("input", "", "input localizations folder")
+	output     = flag.String("output", "", "where to output the generated package")
+	isDownload = flag.Bool("download", false, "download from weblate")
+	project    = flag.String("project", "backend", "tms project")
+	component  = flag.String("component", "", "tms component")
+	token      = flag.String("token", "", "tms auth token")
 
 	errFlagInputNotSet = errors.New("the flag -input must be set")
 	needRemovePaths    = make([]string, 0)
 )
 
+var (
+	httpClient = resty.New().SetHostURL(tmsBaseApi)
+)
+
 func main() {
 	flag.Parse()
+
+	if *isDownload {
+		download()
+	}
 
 	if err := run(input, output); err != nil {
 		log.Fatal(err.Error())
@@ -164,7 +186,7 @@ func generateFile(output string, keys []string, localizations map[string]string)
 		keyMap[strcase.ToCamel(v)] = v
 	}
 
-	return packageTemplate.Execute(f, TmplValues{
+	return template.PackageTemplate.Execute(f, TmplValues{
 		Timestamp:     time.Now(),
 		Keys:          keyMap,
 		Localizations: localizations,
@@ -334,4 +356,33 @@ func removeZipFile(paths []string) {
 	for _, v := range paths {
 		_ = os.RemoveAll(v)
 	}
+}
+
+func download() {
+
+	httpClient = httpClient.SetAuthScheme("Token").SetAuthToken(*token)
+
+	var resp models.WeblateTranslationResult
+	if _, err := httpClient.R().SetResult(&resp).SetPathParams(map[string]string{
+		"project":    *project,
+		"components": *component,
+	}).Get(translationsApi); err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	var wg sync.WaitGroup
+
+	for _, v := range resp.Results {
+		wg.Add(1)
+		filePath := path.Join(*input, fmt.Sprintf("%s.yml", v.LanguageCode))
+		log.Println("download......", filePath)
+		if _, err := httpClient.R().SetOutput(filePath).Get(v.FileUrl); err != nil {
+			log.Fatal(err)
+		}
+		needRemovePaths = append(needRemovePaths, filePath)
+		wg.Done()
+	}
+
+	wg.Wait()
 }
